@@ -1,3 +1,5 @@
+pip3 install windpowerlib
+
 __copyright__ = "Copyright oemof developer group"
 __license__ = "GPLv3"
 
