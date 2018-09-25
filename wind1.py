@@ -65,3 +65,107 @@ def get_weather_data(filename='weather.csv', **kwargs):
 # Read weather data from csv
 weather = get_weather_data(filename='weather.csv', datapath='')
 print(weather[['wind_speed', 'temperature', 'pressure']][0:3])
+
+# get power curves
+# get names of wind turbines for which power curves are provided (default)
+# set print_out=True to see the list of all available wind turbines
+wt.get_turbine_types(print_out=False)
+
+# get power coefficient curves
+# write names of wind turbines for which power coefficient curves are provided
+# to 'turbines' DataFrame
+turbines = wt.get_turbine_types(filename='power_coefficient_curves.csv', print_out=False)
+# find all Enercons in 'turbines' DataFrame
+print(turbines[turbines["turbine_id"].str.contains("ENERCON")])
+
+# specification of own wind turbine (Note: power coefficient values and
+# nominal power have to be in Watt)
+myTurbine = {
+    'name': 'myTurbine',
+    'nominal_power': 3e6,  # in W
+    'hub_height': 105,  # in m
+    'rotor_diameter': 90,  # in m
+    'power_curve': pd.DataFrame(
+            data={'power': [p * 1000 for p in [
+                      0.0, 26.0, 180.0, 1500.0, 3000.0, 3000.0]],  # in W
+                  'wind_speed': [0.0, 3.0, 5.0, 10.0, 15.0, 25.0]})  # in m/s
+    }
+# initialise WindTurbine object
+my_turbine = WindTurbine(**myTurbine)
+
+# specification of wind turbine where power curve is provided
+# if you want to use the power coefficient curve change the value of
+# 'fetch_curve' to 'power_coefficient_curve'
+enerconE126 = {
+    'name': 'ENERCON E 126 7500',  # turbine name as in register
+    'hub_height': 135,  # in m
+    'rotor_diameter': 127,  # in m
+    'fetch_curve': 'power_curve'  # fetch power curve
+}
+# initialise WindTurbine object
+e126 = WindTurbine(**enerconE126)
+
+# power output calculation for my_turbine
+# initialise ModelChain with default parameters and use run_model
+# method to calculate power output
+mc_my_turbine = ModelChain(my_turbine).run_model(weather)
+# write power output timeseries to WindTurbine object
+my_turbine.power_output = mc_my_turbine.power_output
+
+# power output calculation for e126
+# own specifications for ModelChain setup
+modelchain_data = {
+    'wind_speed_model': 'logarithmic',      # 'logarithmic' (default),
+                                            # 'hellman' or
+                                            # 'interpolation_extrapolation'
+    'density_model': 'ideal_gas',           # 'barometric' (default), 'ideal_gas'
+                                            #  or 'interpolation_extrapolation'
+    'temperature_model': 'linear_gradient', # 'linear_gradient' (def.) or
+                                            # 'interpolation_extrapolation'
+    'power_output_model': 'power_curve',    # 'power_curve' (default) or
+                                            # 'power_coefficient_curve'
+    'density_correction': True,             # False (default) or True
+    'obstacle_height': 0,                   # default: 0
+    'hellman_exp': None}                    # None (default) or None
+
+# initialise ModelChain with own specifications and use run_model method to
+# calculate power output
+mc_e126 = ModelChain(e126, **modelchain_data).run_model(
+    weather)
+# write power output timeseries to WindTurbine object
+e126.power_output = mc_e126.power_output
+
+# try to import matplotlib
+try:
+    from matplotlib import pyplot as plt
+    # matplotlib inline needed in notebook to plot inline
+    %matplotlib inline
+except ImportError:
+    plt = None
+
+# plot turbine power output
+if plt:
+    e126.power_output.plot(legend=True, label='Enercon E126')
+    my_turbine.power_output.plot(legend=True, label='myTurbine')
+    plt.show()
+
+# plot power (coefficient) curves
+if plt:
+    if e126.power_coefficient_curve is not None:
+        e126.power_coefficient_curve.plot(
+            x='wind_speed', y='power coefficient', style='*',
+            title='Enercon E126 power coefficient curve')
+        plt.show()
+    if e126.power_curve is not None:
+        e126.power_curve.plot(x='wind_speed', y='power', style='*',
+                              title='Enercon E126 power curve')
+        plt.show()
+    if my_turbine.power_coefficient_curve is not None:
+        my_turbine.power_coefficient_curve.plot(
+            x='wind_speed', y='power coefficient', style='*',
+            title='myTurbine power coefficient curve')
+        plt.show()
+    if my_turbine.power_curve is not None:
+        my_turbine.power_curve.plot(x='wind_speed', y='power', style='*',
+                                    title='myTurbine power curve')
+        plt.show()
